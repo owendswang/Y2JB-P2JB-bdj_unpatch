@@ -1,3 +1,17 @@
+/*
+ * p2jb-y2jb - PS5 jailbreak port to Y2JB (YouTube/JS), tested on FW 11.60,
+ *            offsets bundled for FW 9.00 - 12.40.
+ * MIT License - see LICENSE.
+ *
+ * Credits:
+ *   - p2jb kernel exploit (cr_ref overflow via kqueueex): Gezine / cheburek3000
+ *     (https://github.com/Gezine/Luac0re)
+ *   - Y2JB userland framework: Gezine (https://github.com/Gezine/Y2JB)
+ *   - elfldr_1320 ELF loader binary: Gezine
+ *   - notmaj0r remote_lua_loader p2jb port (secondary reference)
+ *
+ * Usage: see README.md.
+ */
 
 (async function () {
     try {
