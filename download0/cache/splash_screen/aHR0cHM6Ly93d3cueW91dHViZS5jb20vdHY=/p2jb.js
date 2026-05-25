@@ -1,5 +1,4 @@
-(async function () {
-    const js_code = String.raw`/*
+/*
  * p2jb-y2jb - PS5 jailbreak port to Y2JB (YouTube/JS), tested on FW 11.60,
  *            offsets bundled for FW 9.00 - 12.40.
  * MIT License - see LICENSE.
@@ -15,8 +14,10 @@
  */
 
 (async function () {
+    const js_code = String.raw`
+(async function () {
     try {
-        const p2jb_version = "P2JB 2.5 (Y2JB port) + bdj_unpatch";
+        const p2jb_version = "P2JB 2.5 (Y2JB port)";
 
         const PAGE_SIZE = 0x4000;
 
