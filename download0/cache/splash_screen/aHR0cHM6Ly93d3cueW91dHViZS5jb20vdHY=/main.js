@@ -928,7 +928,7 @@ function trigger() {
             send_notification("Already jailbroken!");
 
             await load_localscript('remotejsloader.js');
-        } else if (compare_version(FW_VERSION, "12.00") > 0) {
+        } else if (compare_version(FW_VERSION, "12.70") > 0) {
             await log("Unsupported fw " + FW_VERSION);
             send_notification("Unsupported fw " + FW_VERSION);
 
