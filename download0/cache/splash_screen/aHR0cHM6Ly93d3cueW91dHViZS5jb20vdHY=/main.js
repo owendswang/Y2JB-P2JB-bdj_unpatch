@@ -5,7 +5,7 @@
     of the MIT license.  See the LICENSE file for details.
 */
 
-const version_string = "Y2JB 1.3 by Gezine";
+const version_string = "Y2JB 1.5 by Gezine";
 
 function load_localscript(src) {
     return new Promise((resolve, reject) => {
@@ -899,18 +899,13 @@ function trigger() {
         await checkLogServer();
         
         FW_VERSION = get_fwversion();
+        TITLE_ID = get_title_id();
         
-        send_notification(version_string + "\nFW : " + FW_VERSION);
+        send_notification(version_string + "\nFW : " + FW_VERSION + "\nTitle ID : " + TITLE_ID);
         await log("FW detected : " + FW_VERSION);
+        await log("Title ID detected : " + TITLE_ID);
         
         await log("libkernel_base @ " + toHex(libkernel_base));
-        try {
-            SCE_KERNEL_DLSYM = libkernel_base + get_dlsym_offset(FW_VERSION);
-            await log("SCE_KERNEL_DLSYM @ " + toHex(SCE_KERNEL_DLSYM));
-        } catch (e) {
-            SCE_KERNEL_DLSYM = sceKernelGetModuleInfoFromAddr - 0x450n;
-            await log("WARNING : sceKernelDlsym offset not found\nUsing predicted value " + toHex(SCE_KERNEL_DLSYM));
-        }
         
         // Used for gpu rw
         sceKernelAllocateMainDirectMemory = read64(eboot_base + 0x2A65EF8n);
@@ -922,11 +917,7 @@ function trigger() {
         Thrd_join = libc_base + 0x49F0n;
         
         await load_localscript('kernel.js');
-        await load_localscript('kernel_offset.js');
-        await load_localscript('gpu.js');
-        await load_localscript('elf_loader.js');
-        
-        send_notification("Close two PSN dialogs manually");
+        await load_localscript('aioshellcode.js');
         
         ////////////////////
         // MAIN EXECUTION //
@@ -935,11 +926,23 @@ function trigger() {
         if (is_jailbroken()) {
             await log('Already jailbroken!');
             send_notification("Already jailbroken!");
+
             await load_localscript('remotejsloader.js');
+        } else if (compare_version(FW_VERSION, "12.00") > 0) {
+            await log("Unsupported fw " + FW_VERSION);
+            send_notification("Unsupported fw " + FW_VERSION);
+
+            return;
+        } else if (compare_version(FW_VERSION, "10.01") > 0) {
+            await log('Exploit starting in 3 seconds...');
+            nanosleep(3 * 1_000_000_000);
+
+            await load_localscript('p2jb.js');
         } else {
             await log('Exploit starting in 3 seconds...');
             nanosleep(3 * 1_000_000_000);
-            await load_localscript('p2jb_bdjunpatch.js');
+
+            await load_localscript('lapse.js');
         }
 
     } catch (e) {                

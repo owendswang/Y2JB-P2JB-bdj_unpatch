@@ -1,0 +1,10 @@
+.git
+*.bak
+/payloads/ftp.js
+/download0.dat
+/create_download0_image.sh
+/*_elf/*.elf
+/kill_youtube_elf
+/ps5_autoloader/*.elf
+/download0/cache/splash_screen/aHR0cHM6Ly93d3cueW91dHViZS5jb20vdHY=/*.elf
+/download0/cache/splash_screen/aHR0cHM6Ly93d3cueW91dHViZS5jb20vdHY=/*.bin
