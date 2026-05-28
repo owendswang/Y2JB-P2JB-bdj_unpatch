@@ -1824,6 +1824,7 @@
 
         await send_autoload_elf();
 
+        nanosleep(1_000_000_000);
         kill_youtube();
 
     } catch (e) {

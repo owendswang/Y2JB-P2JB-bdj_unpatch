@@ -9,20 +9,6 @@ let allproc     = 0n;
 let master_pipe = null;
 let victim_pipe = null;
 
-function find_file(filename) {
-    const search = [
-        "/mnt/sandbox/" + TITLE_ID + "_000/download0/cache/splash_screen/aHR0cHM6Ly93d3cueW91dHViZS5jb20vdHY=/" + filename,
-        "/mnt/sandbox/" + TITLE_ID + "_001/download0/cache/splash_screen/aHR0cHM6Ly93d3cueW91dHViZS5jb20vdHY=/" + filename,
-        "/mnt/sandbox/" + TITLE_ID + "_002/download0/cache/splash_screen/aHR0cHM6Ly93d3cueW91dHViZS5jb20vdHY=/" + filename,
-    ];
-    for (const path of search) {
-        if (file_exists(path)) {
-            return path;
-        }
-    }
-    return null;
-}
-
 async function map_shellcode(bin_data) {
     const size         = BigInt(bin_data.length);
     const aligned_size = (size + BigInt(PAGE_SIZE) - 1n) & ~(BigInt(PAGE_SIZE) - 1n);
