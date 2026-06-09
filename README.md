@@ -1,6 +1,6 @@
-# Y2JB + P2JB + bdj_unpatch
+# Y2JB + P2JB + Autoloader
 
-Based on [Gezine/Y2JB](https://github.com/Gezine/Y2JB), chained with [matem6/P2JB-Y2JB-Porting](https://github.com/matem6/P2JB-Y2JB-Porting) and [Gezine/bdj_unpatch](https://github.com/Gezine/BD-UN-JB/tree/main/bdj_unpatch).
+Based on [Gezine/Y2JB](https://github.com/Gezine/Y2JB), chained with [matem6/P2JB-Y2JB-Porting](https://github.com/matem6/P2JB-Y2JB-Porting) and Autoloader (ps5_autoload.elf).
 
 ## Brief
 
@@ -9,8 +9,8 @@ If lucky, one time run (~50 minutes) would succeed and switch to BD-UN-JB for PS
 
 ## Requirements
 
-PS5 firmware version from 9.00 to 12.40 disc edition.  
-But only from 10.20 to 12.00, it is reasonable to unpatch bdj. Because poopsloit only support upto 12.00 and Y2JB+Lapse works perfect upto 10.01.
+PS5 firmware version from 4.03 to 12.70.  
+From 4.03 to 10.01, it runs 'lapse' to do kernel exploit. From 10.20 to 12.00, it runs 'poopsloit' to do kernel exploit.
 
 ### For Jailbroken PS5
 No need to use this. Just send bdj_unpatch.elf to elfldr would do.
@@ -49,14 +49,14 @@ The DNS configuration is critical for Y2JB to function properly for two technica
 1. Download the backup file from the releases page
 2. Follow Sony's official guide to [restore backup data from USB](https://www.playstation.com/en-gb/support/hardware/back-up-ps5-data-USB/)  
    **⚠️ WARNING:** Restoring backup data **WILL FACTORY RESET YOUR PS5**. All data on your console will be erased.
-3. Hit Y2B and wait for ~50 minutes. If logging on screen shows 'complete', it means success. Just shutdown/reboot. If failed reboot and try again.  
-   **⚠️ WARNING:** It's normal that kernel panic would happen when closing Y2B after success. It's current p2jb.js's issue. But it doesn't affect bdj_unpatch.  
+3. Hit Y2B and wait for ~50 minutes.
    Mostly, PS5 would repair storage automatically when startup and reboot into system normally. Or maybe other bad things might happen because of kernel panic.
-4. After bdj_unpatch success, use BD-UN-JB disc for fast and stable method. Y2B is no longer needed and can be deleted.
+4. If it succeeded, Y2B would close automatically and start Autoload sequence.
+   If it failed, a notification would pop up on the top left corner on the screen and Y2B would remain open with error logs on the screen. Just shutdown/reboot and retry or switch to other ways for stabler experience.
 
 ## Sending Payloads
 
-**No need** to do this for bdj_unpatch. But if you run Y2B when already jailbroken, remote js loader would run.
+**No need** to do this. But if you run Y2B when already jailbroken, remote js loader would run.
 
 **Note:** The Remote JS Server does not always use port 50000. While it typically defaults to port 50000, it may occasionally use a different port - this is normal behavior, not a bug.
 
@@ -85,7 +85,7 @@ python payload_sender.py 192.168.1.100 9020 payload.bin
 * **[john-tornblom](https://github.com/john-tornblom) and [EchoStretch](https://github.com/EchoStretch)** - Providing elfldr.elf payload
 * **[hammer-83](https://github.com/hammer-83)** - Various BD-J PS5 exploit references
 * **[zecoxao](https://github.com/zecoxao), [idlesauce](https://github.com/idlesauce), and [TheFlow](https://github.com/theofficialflow)** - Helping troubleshoot dlsym
-* **[Dr.Yenyen](https://github.com/DrYenyen) and PS5 R&D community** - Testing Y2JB
+* **[Dr.Yenyen](https://github.com/DrYenyen) and PS5 R&D community** - Testing Y2JB and Autoloader
 * **Rush** - Creating Y2JB backup file
 * **[matem6](https://github.com/matem6)** - Porting P2JB to Y2JB.
 * **Edigax** — help with the multi-core leak implementation, bringing the `cr_ref` leak down from ~2 hours to ~48 minutes.
