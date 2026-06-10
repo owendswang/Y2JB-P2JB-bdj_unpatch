@@ -1,19 +1,18 @@
 # Y2JB + P2JB + Autoloader
 
-Based on [Gezine/Y2JB](https://github.com/Gezine/Y2JB), chained with [matem6/P2JB-Y2JB-Porting](https://github.com/matem6/P2JB-Y2JB-Porting) and Autoloader (ps5_autoload.elf).
+Based on [Gezine/Y2JB](https://github.com/Gezine/Y2JB), chained with [Gezine/Lapse](https://github.com/Gezine/Y2JB/blob/main/payloads/lapse.js) or [matem6/P2JB-Y2JB-Porting](https://github.com/matem6/P2JB-Y2JB-Porting) and [Autoloader (ps5_autoload.elf)](https://github.com/owendswang/Y2JB-P2JB-bdj_unpatch/tree/autoloader/ps5_autoload_elf).
 
 ## Brief
 
-This is just for **simple + local (no network needed) + auto** unpatch bdj via Y2JB with P2JB.  
-If lucky, one time run (~50 minutes) would succeed and switch to BD-UN-JB for PS5 FW 10.20-12.00 disc edition.
+This is just for **simple + local (no network needed) + Autoloader** via Y2JB with Lapse and P2JB.
 
 ## Requirements
 
 PS5 firmware version from 4.03 to 12.70.  
-From 4.03 to 10.01, it runs 'lapse' to do kernel exploit. From 10.20 to 12.00, it runs 'poopsloit' to do kernel exploit.
+(From 4.03 to 10.01, it runs 'lapse' to do kernel exploit. From 10.20 to 12.00, it runs 'p2jb' to do kernel exploit.)
 
 ### For Jailbroken PS5
-No need to use this. Just send bdj_unpatch.elf to elfldr would do.
+No need to use this. Just send 'bdj_unpatch.elf' to elfldr would do.
 
 ### For Non-Jailbroken PS5
 - USB flash drive
@@ -46,13 +45,16 @@ The DNS configuration is critical for Y2JB to function properly for two technica
 
 ### Non-Jailbroken PS5
 
-1. Download the backup file from the releases page
+1. Download the backup file from the releases page  
+**Firmware 4.03 – 12.40** and **Firmware 12.60 and up** have different backup files. Choose the one for your firmware version.
 2. Follow Sony's official guide to [restore backup data from USB](https://www.playstation.com/en-gb/support/hardware/back-up-ps5-data-USB/)  
    **⚠️ WARNING:** Restoring backup data **WILL FACTORY RESET YOUR PS5**. All data on your console will be erased.
-3. Hit Y2B and wait for ~50 minutes.
-   Mostly, PS5 would repair storage automatically when startup and reboot into system normally. Or maybe other bad things might happen because of kernel panic.
-4. If it succeeded, Y2B would close automatically and start Autoload sequence.
-   If it failed, a notification would pop up on the top left corner on the screen and Y2B would remain open with error logs on the screen. Just shutdown/reboot and retry or switch to other ways for stabler experience.
+3. Hit Y2B.  
+   'Lapse' kernel exploit would run for firmware version from 4.03 to 10.01. This method runs fast.  
+   'P2JB' kernel exploit would run for firmware version from 10.20 to 12.70. This would take around 50 minutes.
+4. If it succeeded, Y2B would close automatically and start Autoload sequence.  
+   If it failed, a notification would pop up on the top left corner on the screen and Y2B would remain open with error logs on the screen. Just shutdown/reboot and retry or switch to other ways for stabler experience.  
+   **⚠️ WARNING:** Kernel panic might happen whatever success or failure. Take your own risk.
 
 ## Sending Payloads
 
@@ -85,7 +87,7 @@ python payload_sender.py 192.168.1.100 9020 payload.bin
 * **[john-tornblom](https://github.com/john-tornblom) and [EchoStretch](https://github.com/EchoStretch)** - Providing elfldr.elf payload
 * **[hammer-83](https://github.com/hammer-83)** - Various BD-J PS5 exploit references
 * **[zecoxao](https://github.com/zecoxao), [idlesauce](https://github.com/idlesauce), and [TheFlow](https://github.com/theofficialflow)** - Helping troubleshoot dlsym
-* **[Dr.Yenyen](https://github.com/DrYenyen) and PS5 R&D community** - Testing Y2JB and Autoloader
+* **[Dr.Yenyen](https://github.com/DrYenyen) and PS5 R&D community** - Testing Y2JB and Autoloader. Creating system backup files.
 * **Rush** - Creating Y2JB backup file
 * **[matem6](https://github.com/matem6)** - Porting P2JB to Y2JB.
 * **Edigax** — help with the multi-core leak implementation, bringing the `cr_ref` leak down from ~2 hours to ~48 minutes.
