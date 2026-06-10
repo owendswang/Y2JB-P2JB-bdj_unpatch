@@ -11,6 +11,7 @@ If lucky, one time run (~50 minutes) would succeed and switch to BD-UN-JB for PS
 
 PS5 firmware version from 9.00 to 12.40 disc edition.  
 But only from 10.20 to 12.00, it is reasonable to unpatch bdj. Because poopsloit only support upto 12.00 and Y2JB+Lapse works perfect upto 10.01.
+(Then sorry for not providing support up to 12.70 for this branch. It's not necessary for now. But you could try [Autoloader](https://github.com/owendswang/Y2JB-P2JB-bdj_unpatch/tree/autoloader) for higher firmware version support.)
 
 ### For Jailbroken PS5
 No need to use this. Just send bdj_unpatch.elf to elfldr would do.
@@ -50,9 +51,8 @@ The DNS configuration is critical for Y2JB to function properly for two technica
 2. Follow Sony's official guide to [restore backup data from USB](https://www.playstation.com/en-gb/support/hardware/back-up-ps5-data-USB/)  
    **⚠️ WARNING:** Restoring backup data **WILL FACTORY RESET YOUR PS5**. All data on your console will be erased.
 3. Hit Y2B and wait for ~50 minutes. If logging on screen shows 'complete', it means success. Just shutdown/reboot. If failed reboot and try again.  
-   **⚠️ WARNING:** It's normal that kernel panic would happen when closing Y2B after success. It's current p2jb.js's issue. But it doesn't affect bdj_unpatch.  
-   Mostly, PS5 would repair storage automatically when startup and reboot into system normally. Or maybe other bad things might happen because of kernel panic.
-4. After bdj_unpatch success, use BD-UN-JB disc for fast and stable method. Y2B is no longer needed and can be deleted.
+4. After bdj_unpatch success, use BD-UN-JB disc for fast and stable method. Y2B is no longer needed and can be deleted.  
+   **⚠️ WARNING:** Kernel panic might happen whatever success or failure. Take your own risk.
 
 ## Sending Payloads
 

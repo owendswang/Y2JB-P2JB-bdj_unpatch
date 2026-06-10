@@ -2279,7 +2279,7 @@
                 fail("elfldr is not running!");
             }
 
-            const payload_name = "bdj_unpatch_1320_v2.elf";
+            const payload_name = "bdj_unpatch_1340.elf";
             const payload_path = find_file(payload_name);
 
             if (!payload_path) {
