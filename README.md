@@ -1,3 +1,9 @@
+# Archived: DO NOT USE!
+
+Gezine has updated BD-UN-JB to [BD-JB5](https://github.com/Gezine/BD-JB5) which supports upto PS5 FW 13.42 without bdj_unpatch. So this thing is not needed anymore for disc version of PS5 FW upto 12.00.
+
+---
+
 # Y2JB + P2JB + bdj_unpatch
 
 Based on [Gezine/Y2JB](https://github.com/Gezine/Y2JB), chained with [matem6/P2JB-Y2JB-Porting](https://github.com/matem6/P2JB-Y2JB-Porting) and [Gezine/bdj_unpatch](https://github.com/Gezine/BD-UN-JB/tree/main/bdj_unpatch).
